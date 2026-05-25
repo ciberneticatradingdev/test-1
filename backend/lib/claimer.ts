@@ -22,9 +22,13 @@ import { emitEvent } from "./events.js"
 const SOLSCAN_TX = "https://solscan.io/tx"
 
 const PUMP_FUN = new PublicKey(config.pumpMain)
+const TOKEN_MINT_PK = new PublicKey(config.tokenMint)
 
-// Fee accumulator — collects creator fees from bonding curve trades
-const FEE_ACCUMULATOR = new PublicKey("79zVwEh3BHYs5N352uNuCQZv16swdtriAP1Sgm6ksbLA")
+// Bonding curve PDA — holds creator fees in pump.fun v2
+const [BONDING_CURVE] = PublicKey.findProgramAddressSync(
+  [Buffer.from("bonding-curve"), TOKEN_MINT_PK.toBuffer()],
+  PUMP_FUN
+)
 
 // CollectCreatorFeeV2 discriminator (works for both SOL and USDC)
 const COLLECT_CREATOR_FEE_V2_DISC = Buffer.from("cf118af204221338", "hex")
@@ -37,20 +41,20 @@ const [EVENT_AUTHORITY] = PublicKey.findProgramAddressSync(
 
 /**
  * Build CollectCreatorFeeV2 instruction.
- * Same discriminator for SOL and USDC — only the accounts differ.
+ * Uses bonding curve (not global fee accumulator) — pump.fun v2 stores fees in the curve.
  */
 function buildCollectCreatorFee(creator: Keypair): TransactionInstruction {
   const mint = REWARD_MINT
   const creatorAta = getAssociatedTokenAddressSync(mint, creator.publicKey)
-  const feeAccumulatorAta = getAssociatedTokenAddressSync(mint, FEE_ACCUMULATOR, true)
+  const bondingCurveAta = getAssociatedTokenAddressSync(mint, BONDING_CURVE, true)
 
   return new TransactionInstruction({
     programId: PUMP_FUN,
     keys: [
       { pubkey: creator.publicKey, isSigner: true, isWritable: true },
       { pubkey: creatorAta, isSigner: false, isWritable: true },
-      { pubkey: FEE_ACCUMULATOR, isSigner: false, isWritable: true },
-      { pubkey: feeAccumulatorAta, isSigner: false, isWritable: true },
+      { pubkey: BONDING_CURVE, isSigner: false, isWritable: true },
+      { pubkey: bondingCurveAta, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
