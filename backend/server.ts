@@ -1,6 +1,6 @@
 import express from "express"
 import cors from "cors"
-import { config, rewardSymbol } from "./lib/config.js"
+import { config, isSOLMode, rewardSymbol } from "./lib/config.js"
 import { connection, getWallet, getTokenMint, getTokenHolders, getRewardBalance, getUnclaimedFees } from "./lib/solana.js"
 import { runDistributionCycle } from "./lib/claimer.js"
 import { store } from "./lib/store.js"
