@@ -180,3 +180,4 @@ app.listen(config.port, async () => {
     console.log("[DIST] ⚠️  Not starting — configure TOKEN_MINT and WALLET_PRIVATE_KEY in .env")
   }
 })
+
