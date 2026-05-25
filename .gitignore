@@ -4,3 +4,4 @@ node_modules
 .env.local
 backend/.env
 backend/node_modules
+.vercel
