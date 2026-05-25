@@ -41,6 +41,12 @@ class Store {
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$;
 
+      -- Add total_claimed column if missing (existing installs)
+      DO $$ BEGIN
+        ALTER TABLE stats ADD COLUMN total_claimed NUMERIC(20, 6) NOT NULL DEFAULT 0;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+
       CREATE TABLE IF NOT EXISTS distributions (
         id SERIAL PRIMARY KEY,
         round INTEGER NOT NULL,
@@ -105,6 +111,21 @@ class Store {
     await pool.query(
       "UPDATE stats SET pending_balance = 0, updated_at = NOW() WHERE id = 1"
     )
+  }
+
+  /** Add to total claimed (fees reclaimed from pump.fun) */
+  async addClaimed(amount: number) {
+    await pool.query(
+      "UPDATE stats SET total_claimed = total_claimed + $1, updated_at = NOW() WHERE id = 1",
+      [amount]
+    )
+  }
+
+  /** Get total claimed historically */
+  async getClaimed(): Promise<number> {
+    const res = await pool.query("SELECT total_claimed FROM stats WHERE id = 1")
+    if (res.rows.length === 0) return 0
+    return parseFloat(res.rows[0].total_claimed) || 0
   }
 
   /** Get events with pagination */
@@ -224,14 +245,15 @@ class Store {
   }
 
   async getStats() {
-    const res = await pool.query("SELECT total_distributed, total_rounds FROM stats WHERE id = 1")
+    const res = await pool.query("SELECT total_distributed, total_rounds, total_claimed FROM stats WHERE id = 1")
     if (res.rows.length === 0) {
-      return { totalDistributed: "$0.00", totalRounds: 0 }
+      return { totalDistributed: "$0.00", totalRounds: 0, totalClaimed: "$0.00" }
     }
     const row = res.rows[0]
     return {
       totalDistributed: `$${parseFloat(row.total_distributed).toFixed(2)}`,
       totalRounds: parseInt(row.total_rounds),
+      totalClaimed: `$${parseFloat(row.total_claimed).toFixed(2)}`,
     }
   }
 

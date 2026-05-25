@@ -182,11 +182,6 @@ export async function runDistributionCycle(): Promise<{
   try {
     await emitEvent("CYCLE_START", `🔄 Distribution cycle #${round} started`, { round })
 
-    const balanceBefore = await getRewardBalance(wallet.publicKey)
-    await emitEvent("BALANCE_CHECK", `💰 ${sym} balance before claim: ${formatAmount(balanceBefore)}`, {
-      round, balance: balanceBefore, wallet: wallet.publicKey.toBase58(),
-    })
-
     // Pending from previous cycles
     const pendingBalance = await store.getPendingBalance()
     if (pendingBalance > 0) {
@@ -204,10 +199,12 @@ export async function runDistributionCycle(): Promise<{
       claimTxSig = result.txSignature
 
       if (claimed > 0 && claimTxSig) {
-        await emitEvent("CLAIM_DETECTED", `📊 Claimed ${formatAmount(claimed)} ${sym} creator fees`, {
+        await store.addClaimed(claimed)
+        const totalClaimed = await store.getClaimed()
+        await emitEvent("CLAIM_DETECTED", `📊 Claimed ${formatAmount(claimed)} ${sym} creator fees (total claimed: ${formatAmount(totalClaimed)})`, {
           round, claimed, txSignature: claimTxSig,
           solscanUrl: `${SOLSCAN_TX}/${claimTxSig}`,
-          balanceBefore, balanceAfter: balanceBefore + claimed,
+          totalClaimed,
         })
         console.log(`[DIST] Claimed ${formatAmount(claimed)} ${sym} (tx: ${claimTxSig})`)
       } else {
@@ -220,8 +217,9 @@ export async function runDistributionCycle(): Promise<{
 
     const distributable = claimed + pendingBalance
     if (distributable < 0.0001) {
-      await emitEvent("CYCLE_SKIP", `⏭️ Cycle #${round} — nothing to distribute (claimed: ${formatAmount(claimed)}, pending: ${formatAmount(pendingBalance)})`, {
-        round, claimed, pendingBalance, balanceBefore,
+      const totalClaimed = await store.getClaimed()
+      await emitEvent("CYCLE_SKIP", `⏭️ Cycle #${round} — nothing to distribute (claimed: ${formatAmount(claimed)}, pending: ${formatAmount(pendingBalance)}, total claimed: ${formatAmount(totalClaimed)}, total distributed: ${stats.totalDistributed})`, {
+        round, claimed, pendingBalance, totalClaimed, totalDistributed: stats.totalDistributed,
       })
       console.log(`[DIST] Nothing to distribute`)
       return { success: true, distributed: 0, holders: 0 }
@@ -234,9 +232,11 @@ export async function runDistributionCycle(): Promise<{
 
     if (qualifiedHolders.length === 0) {
       if (claimed > 0) await store.addPendingBalance(claimed)
-      await emitEvent("CYCLE_SKIP", `⏭️ Cycle #${round} — ${formatAmount(distributable)} pending, no qualified holders (min: ${config.minHolding.toLocaleString()})`, {
+      const totalClaimed = await store.getClaimed()
+      await emitEvent("CYCLE_SKIP", `⏭️ Cycle #${round} — ${formatAmount(distributable)} pending, no qualified holders (min: ${config.minHolding.toLocaleString()}, total claimed: ${formatAmount(totalClaimed)}, total distributed: ${stats.totalDistributed})`, {
         round, claimed, distributable, pendingBalance: distributable,
         totalHolders: allHolders.length, minHolding: config.minHolding,
+        totalClaimed, totalDistributed: stats.totalDistributed,
       })
       console.log(`[DIST] No qualified holders — ${formatAmount(distributable)} saved as pending`)
       return { success: true, distributed: 0, holders: 0 }
@@ -310,9 +310,11 @@ export async function runDistributionCycle(): Promise<{
     await store.addDistributions(distRecords)
     await store.clearPendingBalance()
 
-    await emitEvent("CYCLE_COMPLETE", `✅ Cycle #${round} complete: claimed ${formatAmount(claimed)}, distributed ${formatAmount(totalSent)} ${sym} to ${meaningful.length} holders`, {
+    const totalClaimed = await store.getClaimed()
+    await emitEvent("CYCLE_COMPLETE", `✅ Cycle #${round} complete: claimed ${formatAmount(claimed)}, distributed ${formatAmount(totalSent)} ${sym} to ${meaningful.length} holders (total claimed: ${formatAmount(totalClaimed)}, total distributed: ${stats.totalDistributed})`, {
       round, claimed, pendingCleared: pendingBalance,
       totalDistributed: totalSent, holders: meaningful.length, claimTx: claimTxSig,
+      totalClaimed, totalDistributedHistorical: stats.totalDistributed,
     })
 
     console.log(`[DIST] Round complete: ${formatAmount(totalSent)} ${sym} to ${meaningful.length} holders`)

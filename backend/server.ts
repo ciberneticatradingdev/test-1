@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors"
 import { config, rewardSymbol } from "./lib/config.js"
-import { connection, getWallet, getTokenMint, getTokenHolders, getRewardBalance } from "./lib/solana.js"
+import { connection, getWallet, getTokenMint, getTokenHolders, getRewardBalance, getUnclaimedFees } from "./lib/solana.js"
 import { runDistributionCycle } from "./lib/claimer.js"
 import { store } from "./lib/store.js"
 import { testConnection } from "./lib/db.js"
@@ -49,26 +49,23 @@ app.get("/api/cycle", (_req, res) => {
 /* ── Stats ── */
 app.get("/api/stats", async (_req, res) => {
   try {
-    const wallet = getWallet()
     const mint = getTokenMint()
 
-    let treasury = "—"
+    let unclaimed = "—"
     let holders = 0
-
-    if (wallet) {
-      const balance = await cached("reward", 60_000, () => getRewardBalance(wallet.publicKey))
-      treasury = config.rewardToken === "SOL" ? `${balance.toFixed(4)} SOL` : `$${balance.toFixed(2)}`
-    }
 
     if (mint) {
       const allHolders = await cached("holders", 120_000, () => getTokenHolders(mint))
       holders = allHolders.filter((h) => h.balance >= config.minHolding).length
+      const unclaimedAmount = await cached("unclaimed", 60_000, () => getUnclaimedFees())
+      unclaimed = isSOLMode ? `${unclaimedAmount.toFixed(4)} SOL` : `$${unclaimedAmount.toFixed(2)}`
     }
 
     const storeStats = await store.getStats()
 
     res.json({
-      treasury,
+      unclaimed,
+      claimed: storeStats.totalClaimed,
       totalDistributed: storeStats.totalDistributed,
       holders,
       totalRounds: storeStats.totalRounds,

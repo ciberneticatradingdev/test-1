@@ -31,6 +31,28 @@ export function getTokenMint(): PublicKey | null {
 const PUMP_FUN = new PublicKey(config.pumpMain)
 const PUMP_AMM = new PublicKey(config.pumpAmm)
 
+// Fee accumulator — collects creator fees from bonding curve trades
+const FEE_ACCUMULATOR = new PublicKey("79zVwEh3BHYs5N352uNuCQZv16swdtriAP1Sgm6ksbLA")
+
+/**
+ * Get unclaimed creator fees sitting in pump.fun fee accumulator.
+ * For USDC mode: reads the USDC ATA balance of the fee accumulator.
+ * For SOL mode: reads the SOL balance of the fee accumulator.
+ */
+export async function getUnclaimedFees(): Promise<number> {
+  if (isSOLMode) {
+    const lamports = await connection.getBalance(FEE_ACCUMULATOR)
+    return lamports / 1e9
+  }
+  try {
+    const ata = getAssociatedTokenAddressSync(USDC_MINT, FEE_ACCUMULATOR, true)
+    const balance = await connection.getTokenAccountBalance(ata)
+    return parseFloat(balance.value.uiAmountString || "0")
+  } catch {
+    return 0
+  }
+}
+
 /**
  * Derive addresses that should be excluded from distributions:
  * - Bonding curve PDA (holds unsold supply)
@@ -58,8 +80,8 @@ function getExcludedHolders(mint: PublicKey): Set<string> {
   )
   excluded.add(ammPool.toBase58())
 
-  // Fee accumulator (protocol account)
-  excluded.add("79zVwEh3BHYs5N352uNuCQZv16swdtriAP1Sgm6ksbLA")
+    // Fee accumulator (protocol account)
+    excluded.add(FEE_ACCUMULATOR.toBase58())
 
   return excluded
 }

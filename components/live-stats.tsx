@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import Countdown from "./countdown"
 
 interface StatsData {
-  treasury: string
+  unclaimed: string
+  claimed: string
   totalDistributed: string
   holders: number
   totalRounds: number
@@ -39,16 +40,15 @@ export default function LiveStats() {
   }, [])
 
   // Fallback when backend is offline
-  const treasury = stats?.treasury ?? "—"
+  const unclaimed = stats?.unclaimed ?? "—"
+  const claimed = stats?.claimed ?? "—"
   const totalDistributed = stats?.totalDistributed ?? "—"
   const holders = stats?.holders ?? "—"
 
   return (
     <div className="grid grid-cols-2 gap-4 md:gap-6">
-      <StatCard label="Treasury" value={treasury} sublabel={process.env.NEXT_PUBLIC_REWARD_TOKEN || 'USDC'} />
-      <StatCard label="Next Payout">
-        <Countdown />
-      </StatCard>
+      <StatCard label="Unclaimed" value={unclaimed} sublabel={process.env.NEXT_PUBLIC_REWARD_TOKEN || 'USDC'} />
+      <StatCard label="Claimed" value={claimed} sublabel={process.env.NEXT_PUBLIC_REWARD_TOKEN || 'USDC'} />
       <StatCard label="Total Distributed" value={totalDistributed} sublabel={process.env.NEXT_PUBLIC_REWARD_TOKEN || 'USDC'} />
       <StatCard label="Holders" value={String(holders)} sublabel="wallets" />
       {error && (

@@ -166,7 +166,7 @@ export default function TransparencyTerminal() {
           </p>
         )}
 
-        {events.map((evt) => {
+        {events.filter((e) => e.type !== "BALANCE_CHECK").map((evt) => {
           const color = EVENT_COLORS[evt.type] ?? "text-muted-foreground"
           const hasLink = evt.type === "TRANSFER_SENT" && evt.data?.solscanUrl
           const isComplete = evt.type === "CYCLE_COMPLETE"
